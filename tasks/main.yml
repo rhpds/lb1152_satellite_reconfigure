@@ -87,6 +87,21 @@
           - "{{ dns_information }}"
           - "The Lets Encrypt certbot failed for the satellite node, please check https://letsencrypt.status.io/ to make sure the service is running"
 
+- name: Restore fapolicyd
+  when: file_data.stat.exists
+  block:
+    - name: Edit fapolicyd
+      ansible.builtin.lineinfile:
+        dest: /etc/fapolicyd/rules.d/30-patterns.rules
+        regexp: '^#deny_audit perm=any pattern=ld_so : all'
+        line: 'deny_audit perm=any pattern=ld_so : all'
+        state: present
+
+    - name: Restart fapolicyd
+      ansible.builtin.service:
+        name: fapolicyd
+        state: restarted
+
 - name: Download LetsEncrypt CA certs
   ansible.builtin.get_url:
     url: "{{ item.url }}"
@@ -172,49 +187,66 @@
       failed_when: '"Success!" not in satellite_update_cert.stdout'
 
   rescue:
-    - name: Copy archive directory
-      ansible.builtin.copy:
-        src: /etc/letsencrypt/archive
-        dest: "{{ item }}"
-        remote_src: true
-        mode: u+rwx,g-rx,o-rx
-      loop:
-        - /root/
-        - /etc/pki/
+    - block:
+        - name: Copy archive directory
+          ansible.builtin.copy:
+            src: /etc/letsencrypt/archive
+            dest: /root/
+            remote_src: true
+            mode: u+rwx,g-rx,o-rx
 
-    - name: Copy archive directory
-      ansible.builtin.copy:
-        src: /etc/letsencrypt/archive
-        dest: /
-        remote_src: true
-        mode: u+rwx,g+rx,o+rx
+        - name: Update satellite with LetsEncrypt cert and enable registration and template modules
+          ansible.builtin.shell: >-
+            satellite-installer --scenario satellite
+            --certs-server-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/fullchain.pem"
+            --certs-server-key "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/privkey.pem"
+            --certs-server-ca-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/letsencrypt-ca-bundle.pem"
+            --certs-update-server --certs-update-server-ca
+            --foreman-proxy-registration true
+            --foreman-proxy-templates true
+          register: satellite_update_cert
+          failed_when: '"Success!" not in satellite_update_cert.stdout'
+      rescue:
+        - block:
+          - name: Copy archive directory
+            ansible.builtin.copy:
+              src: /etc/letsencrypt/archive
+              dest: /
+              remote_src: true
+              mode: u+rwx,g+rx,o+rx
 
-    - name: Update satellite with LetsEncrypt cert and enable registration and template modules
-      ansible.builtin.shell: >-
-        satellite-installer --scenario satellite
-        --certs-server-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/fullchain.pem"
-        --certs-server-key "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/privkey.pem"
-        --certs-server-ca-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/letsencrypt-ca-bundle.pem"
-        --certs-update-server --certs-update-server-ca
-        --foreman-proxy-registration true
-        --foreman-proxy-templates true
-      register: satellite_update_cert
-      failed_when: '"Success!" not in satellite_update_cert.stdout'
+          - name: Update satellite with LetsEncrypt cert and enable registration and template modules
+            ansible.builtin.shell: >-
+              satellite-installer --scenario satellite
+              --certs-server-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/fullchain.pem"
+              --certs-server-key "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/privkey.pem"
+              --certs-server-ca-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/letsencrypt-ca-bundle.pem"
+              --certs-update-server --certs-update-server-ca
+              --foreman-proxy-registration true
+              --foreman-proxy-templates true
+            register: satellite_update_cert
+            failed_when: '"Success!" not in satellite_update_cert.stdout'
 
-- name: Restore fapolicyd
-  when: file_data.stat.exists
-  block:
-    - name: Edit fapolicyd
-      ansible.builtin.lineinfile:
-        dest: /etc/fapolicyd/rules.d/30-patterns.rules
-        regexp: '^#deny_audit perm=any pattern=ld_so : all'
-        line: 'deny_audit perm=any pattern=ld_so : all'
-        state: present
+          rescue:
+            - name: Copy archive directory
+              ansible.builtin.copy:
+                src: /etc/letsencrypt/archive
+                dest: /etc/pki
+                remote_src: true
+                mode: u+rwx,g-rx,o-rx
 
-    - name: Restart fapolicyd
-      ansible.builtin.service:
-        name: fapolicyd
-        state: restarted
+            - name: Update satellite with LetsEncrypt cert and enable registration and template modules
+              ansible.builtin.shell: >-
+                satellite-installer --scenario satellite
+                --certs-server-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/fullchain.pem"
+                --certs-server-key "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/privkey.pem"
+                --certs-server-ca-cert "/etc/letsencrypt/live/{{ lb1152_satellite_reconfigure_external_fqdn }}/letsencrypt-ca-bundle.pem"
+                --certs-update-server --certs-update-server-ca
+                --foreman-proxy-registration true
+                --foreman-proxy-templates true
+              register: satellite_update_cert
+              failed_when: '"Success!" not in satellite_update_cert.stdout'
+
 
 - name: Refresh the manifest
   ansible.builtin.command: 'hammer subscription refresh-manifest --organization="Default Organization"'
