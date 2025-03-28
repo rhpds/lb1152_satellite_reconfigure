@@ -180,6 +180,25 @@
     regexp: '^SELINUX='
     line: 'SELINUX=disabled'
 
+- name: Copy archive directory
+  ansible.builtin.copy:
+    src: /etc/letsencrypt/archive
+    dest: /etc/pki
+    remote_src: true
+
+- name: Copy archive directory
+  ansible.builtin.copy:
+    src: /etc/letsencrypt/archive
+    dest: /root/
+    remote_src: true
+
+- name: Copy archive directory
+  ansible.builtin.copy:
+    src: /etc/letsencrypt/archive
+    dest: /
+    remote_src: true
+    mode: u+rwx,g+rx,o+rx
+
 - name: Update satellite certificates
   block:
     - name: Update satellite with LetsEncrypt cert and enable registration and template modules
@@ -196,11 +215,11 @@
 
   rescue:
     - block:
-        - name: Copy archive directory
-          ansible.builtin.copy:
-            src: /etc/letsencrypt/archive
-            dest: /root/
-            remote_src: true
+        # - name: Copy archive directory
+        #   ansible.builtin.copy:
+        #     src: /etc/letsencrypt/archive
+        #     dest: /root/
+        #     remote_src: true
 
         - name: Update satellite with LetsEncrypt cert and enable registration and template modules
           ansible.builtin.shell: >-
@@ -215,12 +234,12 @@
           failed_when: '"Success!" not in satellite_update_cert.stdout'
       rescue:
         - block:
-          - name: Copy archive directory
-            ansible.builtin.copy:
-              src: /etc/letsencrypt/archive
-              dest: /
-              remote_src: true
-              mode: u+rwx,g+rx,o+rx
+          # - name: Copy archive directory
+          #   ansible.builtin.copy:
+          #     src: /etc/letsencrypt/archive
+          #     dest: /
+          #     remote_src: true
+          #     mode: u+rwx,g+rx,o+rx
 
           - name: Update satellite with LetsEncrypt cert and enable registration and template modules
             ansible.builtin.shell: >-
@@ -235,11 +254,11 @@
             failed_when: '"Success!" not in satellite_update_cert.stdout'
 
           rescue:
-            - name: Copy archive directory
-              ansible.builtin.copy:
-                src: /etc/letsencrypt/archive
-                dest: /etc/pki
-                remote_src: true
+            # - name: Copy archive directory
+            #   ansible.builtin.copy:
+            #     src: /etc/letsencrypt/archive
+            #     dest: /etc/pki
+            #     remote_src: true
 
             - name: Update satellite with LetsEncrypt cert and enable registration and template modules
               ansible.builtin.shell: >-
