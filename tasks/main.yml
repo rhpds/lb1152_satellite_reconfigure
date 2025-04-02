@@ -1,4 +1,10 @@
 ---
+- name: Edit /etc/hosts file
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '.*satellite.example.com'
+    state: absent
+  
 - name: Configure satellite admin password
   ansible.builtin.command: "foreman-rake permissions:reset password={{ lb1152_satellite_reconfigure_user_password }}"
 
